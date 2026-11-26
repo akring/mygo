@@ -712,9 +712,9 @@ func TestBackgroundThrottlingOff(handle uintptr, webView bool) (off bool, settin
 				off = off && v == p.off
 			}
 		}
-		if respondsTo(w.web, "_windowOcclusionDetectionEnabled") {
+		if respondsTo(w.web, spiWindowOcclusionDetectionEnabled) {
 			settings++
-			off = off && !sendBool(w.web, "_windowOcclusionDetectionEnabled")
+			off = off && !sendBool(w.web, spiWindowOcclusionDetectionEnabled)
 		}
 	})
 	return off, settings
@@ -732,18 +732,18 @@ func TestMockCaptureDevices(handle uintptr) bool {
 		return false
 	}
 	prefs := send(send(w.web, "configuration"), "preferences")
-	if !respondsTo(prefs, "_setMockCaptureDevicesEnabled:") {
+	if !respondsTo(prefs, spiSetMockCaptureDevicesEnabled) {
 		return false
 	}
-	send(prefs, "_setMockCaptureDevicesEnabled:", boolArg(true))
-	if respondsTo(prefs, "_setMediaDevicesEnabled:") {
-		send(prefs, "_setMediaDevicesEnabled:", boolArg(true))
+	send(prefs, spiSetMockCaptureDevicesEnabled, boolArg(true))
+	if respondsTo(prefs, spiSetMediaDevicesEnabled) {
+		send(prefs, spiSetMediaDevicesEnabled, boolArg(true))
 	}
-	if respondsTo(prefs, "_setMockCaptureDevicesPromptEnabled:") {
-		send(prefs, "_setMockCaptureDevicesPromptEnabled:", boolArg(false))
+	if respondsTo(prefs, spiSetMockCaptureDevicesPromptEnabled) {
+		send(prefs, spiSetMockCaptureDevicesPromptEnabled, boolArg(false))
 	}
-	if respondsTo(prefs, "_setGetUserMediaRequiresFocus:") {
-		send(prefs, "_setGetUserMediaRequiresFocus:", boolArg(false))
+	if respondsTo(prefs, spiSetGetUserMediaRequiresFocus) {
+		send(prefs, spiSetGetUserMediaRequiresFocus, boolArg(false))
 	}
 	return true
 }
@@ -757,10 +757,10 @@ func TestAllowsPictureInPicture(handle uintptr) (allowed, supported bool) {
 		return false, false
 	}
 	prefs := send(send(w.web, "configuration"), "preferences")
-	if !respondsTo(prefs, "_allowsPictureInPictureMediaPlayback") {
+	if !respondsTo(prefs, spiAllowsPictureInPictureMediaPlayback) {
 		return false, false
 	}
-	return sendBool(prefs, "_allowsPictureInPictureMediaPlayback"), true
+	return sendBool(prefs, spiAllowsPictureInPictureMediaPlayback), true
 }
 
 // TestPageGestures reports whether a swipe navigates and a pinch magnifies
@@ -820,8 +820,8 @@ func TestMaterial(handle uintptr) (class string, style int, radius float64, acti
 	if layer := send(w.view, "layer"); layer != 0 {
 		radius = msgFloat(layer, sel("cornerRadius"))
 	}
-	if respondsTo(w.win, "_hasActiveAppearance") {
-		active = sendBool(w.win, "_hasActiveAppearance")
+	if respondsTo(w.win, spiHasActiveAppearance) {
+		active = sendBool(w.win, spiHasActiveAppearance)
 	}
 	return class, style, radius, active
 }

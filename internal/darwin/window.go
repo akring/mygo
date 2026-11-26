@@ -531,8 +531,8 @@ func (w *window) createWebView(content NSRect) {
 	// Picture in picture, which WKWebView keeps to Safari: the button of
 	// videos' controls, their context menu's item and
 	// requestPictureInPicture().
-	if respondsTo(prefs, "_setAllowsPictureInPictureMediaPlayback:") {
-		send(prefs, "_setAllowsPictureInPictureMediaPlayback:", boolArg(o.PictureInPicture))
+	if respondsTo(prefs, spiSetAllowsPictureInPictureMediaPlayback) {
+		send(prefs, spiSetAllowsPictureInPictureMediaPlayback, boolArg(o.PictureInPicture))
 	}
 	setAutoplay(cfg, o.Autoplay, o.Native != 0)
 
@@ -573,9 +573,9 @@ func (w *window) createWebView(content NSRect) {
 	if respondsTo(w.web, "setInspectable:") {
 		send(w.web, "setInspectable:", boolArg(o.DevTools))
 	}
-	if o.NoBackgroundThrottling && respondsTo(w.web, "_setWindowOcclusionDetectionEnabled:") {
+	if o.NoBackgroundThrottling && respondsTo(w.web, spiSetWindowOcclusionDetectionEnabled) {
 		// A window behind others counts as visible.
-		send(w.web, "_setWindowOcclusionDetectionEnabled:", 0)
+		send(w.web, spiSetWindowOcclusionDetectionEnabled, 0)
 	}
 	// Both are off in a new WKWebView.
 	if o.SwipeNavigation {
@@ -595,11 +595,11 @@ func (w *window) createWebView(content NSRect) {
 		msgSetFloat(w.web, sel("setPageZoom:"), o.Zoom)
 	}
 	send(w.web, "addObserver:forKeyPath:options:context:", uintptr(w.delegate), uintptr(nsString("title")), 1, 0)
-	if respondsTo(w.web, "_isPlayingAudio") {
+	if respondsTo(w.web, spiIsPlayingAudio) {
 		// WebKit tells its changes with willChangeValueForKey: and
 		// didChangeValueForKey:, as Safari's tabs' speaker icons hear.
 		w.observesAudio = true
-		send(w.web, "addObserver:forKeyPath:options:context:", uintptr(w.delegate), uintptr(nsString("_isPlayingAudio")), 0, 0)
+		send(w.web, "addObserver:forKeyPath:options:context:", uintptr(w.delegate), uintptr(nsString(spiIsPlayingAudio)), 0, 0)
 	}
 	// WebKit tells their changes as for _isPlayingAudio.
 	for kind, key := range captureKeys {
@@ -624,9 +624,9 @@ var throttlingPrefs = [...]struct {
 	boolean  bool
 }{
 	{"inactiveSchedulingPolicy", "setInactiveSchedulingPolicy:", 2, false},
-	{"_hiddenPageDOMTimerThrottlingEnabled", "_setHiddenPageDOMTimerThrottlingEnabled:", 0, true},
-	{"_hiddenPageCSSAnimationSuspensionEnabled", "_setHiddenPageCSSAnimationSuspensionEnabled:", 0, true},
-	{"_pageVisibilityBasedProcessSuppressionEnabled", "_setPageVisibilityBasedProcessSuppressionEnabled:", 0, true},
+	{spiHiddenPageDOMTimerThrottlingEnabled, spiSetHiddenPageDOMTimerThrottlingEnabled, 0, true},
+	{spiHiddenPageCSSAnimationSuspensionEnabled, spiSetHiddenPageCSSAnimationSuspensionEnabled, 0, true},
+	{spiPageVisibilityBasedProcessSuppressionEnabled, spiSetPageVisibilityBasedProcessSuppressionEnabled, 0, true},
 }
 
 // setBackgroundThrottling sets throttlingPrefs in prefs, the preferences
@@ -692,7 +692,7 @@ func (w *window) stopObserving() {
 	send(w.web, "removeObserver:forKeyPath:", uintptr(w.delegate), uintptr(nsString("title")))
 	if w.observesAudio {
 		w.observesAudio = false
-		send(w.web, "removeObserver:forKeyPath:", uintptr(w.delegate), uintptr(nsString("_isPlayingAudio")))
+		send(w.web, "removeObserver:forKeyPath:", uintptr(w.delegate), uintptr(nsString(spiIsPlayingAudio)))
 	}
 	for kind, key := range captureKeys {
 		if w.observesCapture[kind] {
@@ -1244,10 +1244,28 @@ func (w *window) CornerRadius() float64 {
 		return 0
 	case w.radius > 0:
 		return float64(w.radius)
-	case !w.hasStyle(styleTitled) || !respondsTo(w.win, "_cornerRadius"):
+	case !w.hasStyle(styleTitled):
+		return 0
+	case appStore:
+		return w.typicalCornerRadius()
+	case !respondsTo(w.win, spiCornerRadius):
 		return 0
 	}
-	return max(msgFloat(w.win, sel("_cornerRadius")), 0)
+	return max(msgFloat(w.win, sel(spiCornerRadius)), 0)
+}
+
+// typicalCornerRadius is the corner radius of a titled window AppKit
+// draws, for a build for the Mac App Store, which can't ask _cornerRadius:
+// 26 on macOS 26 (whose NSGlassEffectView is new) with a toolbar, 16
+// without one, 10 before.
+func (w *window) typicalCornerRadius() float64 {
+	switch {
+	case !hasClass("NSGlassEffectView"):
+		return 10
+	case send(w.win, "toolbar") != 0:
+		return 26
+	}
+	return 16
 }
 
 func (w *window) Minimize()         { send(w.win, "miniaturize:", 0) }
@@ -1433,8 +1451,8 @@ func (w *window) SetVibrancy(material string) {
 // SetVibrancy sets); NSGlassEffectView has none.
 func (w *window) SetActiveAppearance(v bool) {
 	w.keepActive = v
-	if respondsTo(w.win, "_setForceMainAppearance:") {
-		send(w.win, "_setForceMainAppearance:", boolArg(v))
+	if respondsTo(w.win, spiSetForceMainAppearance) {
+		send(w.win, spiSetForceMainAppearance, boolArg(v))
 	}
 	if w.effect != 0 && !w.glass {
 		send(w.effect, "setState:", w.effectState())
@@ -1789,8 +1807,8 @@ func (w *window) UserAgent() string {
 	var s string
 	withPool(func() {
 		s = goString(send(w.web, "customUserAgent"))
-		if s == "" && respondsTo(w.web, "_userAgent") {
-			s = goString(send(w.web, "_userAgent"))
+		if s == "" && respondsTo(w.web, spiUserAgent) {
+			s = goString(send(w.web, spiUserAgent))
 		}
 	})
 	return s
@@ -1800,26 +1818,26 @@ func (w *window) UserAgent() string {
 // private -[WKWebView _webProcessIdentifier] (a pid_t), 0 when WebKit
 // doesn't answer it or runs no process for the page yet.
 func (w *window) ProcessID() int {
-	if !respondsTo(w.web, "_webProcessIdentifier") {
+	if !respondsTo(w.web, spiWebProcessIdentifier) {
 		return 0
 	}
-	return int(int32(send(w.web, "_webProcessIdentifier")))
+	return int(int32(send(w.web, spiWebProcessIdentifier)))
 }
 
 // GPUProcessID returns WebKit's GPU process from its private
 // -[WKWebView _gpuProcessIdentifier] (a pid_t), 0 when WebKit doesn't
 // answer it or hasn't started the process yet.
 func (w *window) GPUProcessID() int {
-	if !respondsTo(w.web, "_gpuProcessIdentifier") {
+	if !respondsTo(w.web, spiGPUProcessIdentifier) {
 		return 0
 	}
-	return int(int32(send(w.web, "_gpuProcessIdentifier")))
+	return int(int32(send(w.web, spiGPUProcessIdentifier)))
 }
 
 // IsAudible reports WebKit's private -[WKWebView _isPlayingAudio]
 // (macOS 10.13.4+), false when WebKit doesn't answer it.
 func (w *window) IsAudible() bool {
-	return respondsTo(w.web, "_isPlayingAudio") && sendBool(w.web, "_isPlayingAudio")
+	return respondsTo(w.web, spiIsPlayingAudio) && sendBool(w.web, spiIsPlayingAudio)
 }
 
 // wkMediaAudioMuted is _WKMediaAudioMuted, the bit of _WKMediaMutedState
@@ -1830,7 +1848,7 @@ const wkMediaAudioMuted = 1 << 0
 // canMute reports whether WebKit answers the private selectors that mute
 // a page, as Safari mutes a tab (macOS 10.13+).
 func (w *window) canMute() bool {
-	return respondsTo(w.web, "_mediaMutedState") && respondsTo(w.web, "_setPageMuted:")
+	return respondsTo(w.web, spiMediaMutedState) && respondsTo(w.web, spiSetPageMuted)
 }
 
 // wkMediaCaptureDevicesMuted is _WKMediaCaptureDevicesMuted, the bit of
@@ -1848,13 +1866,13 @@ func (w *window) SetAudioMuted(v bool) {
 	if !w.canMute() {
 		return
 	}
-	state := uintptr(send(w.web, "_mediaMutedState"))
+	state := uintptr(send(w.web, spiMediaMutedState))
 	if v {
 		state |= wkMediaAudioMuted
 	} else {
 		state &^= wkMediaAudioMuted
 	}
-	send(w.web, "_setPageMuted:", state)
+	send(w.web, spiSetPageMuted, state)
 	camera, microphone := w.captureMuted[platform.CaptureCamera], w.captureMuted[platform.CaptureMicrophone]
 	if state&wkMediaCaptureDevicesMuted != 0 && camera != microphone {
 		live := platform.CaptureCamera
@@ -1866,7 +1884,7 @@ func (w *window) SetAudioMuted(v bool) {
 }
 
 func (w *window) IsAudioMuted() bool {
-	return w.canMute() && uintptr(send(w.web, "_mediaMutedState"))&wkMediaAudioMuted != 0
+	return w.canMute() && uintptr(send(w.web, spiMediaMutedState))&wkMediaAudioMuted != 0
 }
 
 // captureKeys are the properties of WKWebView that tell the page's
@@ -1875,14 +1893,14 @@ func (w *window) IsAudioMuted() bool {
 // key-value observable. Their values are WKMediaCaptureState's and
 // WKDisplayCaptureState's, none, active and muted, as
 // platform.CaptureState's.
-var captureKeys = [...]string{"cameraCaptureState", "microphoneCaptureState", "_displayCaptureState"}
+var captureKeys = [...]string{"cameraCaptureState", "microphoneCaptureState", spiDisplayCaptureState}
 
 // captureSetters change the capture of captureKeys: their completion
 // handler may be nil.
 var captureSetters = [...]string{
 	"setCameraCaptureState:completionHandler:",
 	"setMicrophoneCaptureState:completionHandler:",
-	"_setDisplayCaptureState:completionHandler:",
+	spiSetDisplayCaptureState,
 }
 
 // CaptureState reports the captureKeys property of kind, CaptureNone when
@@ -1933,9 +1951,9 @@ func (w *window) TogglePictureInPicture() {
 	if !w.opts.PictureInPicture {
 		return
 	}
-	if respondsTo(w.web, "_canTogglePictureInPicture") && respondsTo(w.web, "_togglePictureInPicture") &&
-		sendBool(w.web, "_canTogglePictureInPicture") {
-		send(w.web, "_togglePictureInPicture")
+	if respondsTo(w.web, spiCanTogglePictureInPicture) && respondsTo(w.web, spiTogglePictureInPicture) &&
+		sendBool(w.web, spiCanTogglePictureInPicture) {
+		send(w.web, spiTogglePictureInPicture)
 		return
 	}
 	w.Eval(platform.TogglePictureInPicture)
@@ -1945,7 +1963,7 @@ func (w *window) TogglePictureInPicture() {
 // -[WKWebView _isPictureInPictureActive], false when WebKit doesn't
 // answer it.
 func (w *window) isPictureInPictureActive() bool {
-	return respondsTo(w.web, "_isPictureInPictureActive") && sendBool(w.web, "_isPictureInPictureActive")
+	return respondsTo(w.web, spiIsPictureInPictureActive) && sendBool(w.web, spiIsPictureInPictureActive)
 }
 
 // PictureInPictureActive tells WebKit's _isPictureInPictureActive, which
@@ -1992,11 +2010,11 @@ func (w *window) leavingPage() {
 		return
 	}
 	prefs := send(send(w.web, "configuration"), "preferences")
-	if !respondsTo(prefs, "_setUsesPageCache:") {
+	if !respondsTo(prefs, spiSetUsesPageCache) {
 		return
 	}
 	w.pageCacheOff = off
-	send(prefs, "_setUsesPageCache:", boolArg(!off))
+	send(prefs, spiSetUsesPageCache, boolArg(!off))
 }
 
 // SessionState returns WKWebView's interactionState (macOS 12+), which
@@ -2029,8 +2047,8 @@ func (w *window) RestoreSessionState(state []byte) bool {
 		send(w.web, "setInteractionState:", uintptr(nsData(state)))
 		item := send(send(w.web, "backForwardList"), "currentItem")
 		ok = item != 0
-		if ok && !occlusionVisible(w.win) && respondsTo(item, "_scrollPosition") {
-			w.restoredScroll = msgPoint(item, sel("_scrollPosition"))
+		if ok && !occlusionVisible(w.win) && respondsTo(item, spiScrollPosition) {
+			w.restoredScroll = msgPoint(item, sel(spiScrollPosition))
 		}
 	})
 	return ok
@@ -2088,10 +2106,10 @@ func occlusionVisible(win id) bool {
 }
 
 func (w *window) inspector() id {
-	if !w.opts.DevTools || !respondsTo(w.web, "_inspector") {
+	if !w.opts.DevTools || !respondsTo(w.web, spiInspector) {
 		return 0
 	}
-	return send(w.web, "_inspector")
+	return send(w.web, spiInspector)
 }
 
 func (w *window) OpenDevTools() {
@@ -2552,18 +2570,21 @@ func registerWindowClasses() {
 				if w == nil {
 					return
 				}
-				switch goString(keyPath) {
-				case "title":
+				// Not a switch of cases: the private keys are both "" in a
+				// build for the Mac App Store, which never observes them.
+				switch key := goString(keyPath); {
+				case key == "title":
 					w.h.TitleChanged(goString(send(w.web, "title")))
-				case "_isPlayingAudio":
+				case key == "":
+				case key == spiIsPlayingAudio:
 					w.h.AudibleChanged(w.IsAudible())
-				case "cameraCaptureState":
+				case key == "cameraCaptureState":
 					w.captureChanged(platform.CaptureCamera)
-				case "microphoneCaptureState":
+				case key == "microphoneCaptureState":
 					w.captureChanged(platform.CaptureMicrophone)
-				case "_displayCaptureState":
+				case key == spiDisplayCaptureState:
 					w.captureChanged(platform.CaptureDisplay)
-				case "effectiveAppearance":
+				case key == "effectiveAppearance":
 					// AppKit lays the title bar out again after telling us.
 					b().post(w.layoutTrafficLights)
 				}
@@ -2767,8 +2788,8 @@ func registerWindowClasses() {
 // without it, the action's WKNavigationType says, a link or a form,
 // which misses those.
 func userInitiated(action id, navType int) bool {
-	if respondsTo(action, "_isUserInitiated") {
-		return sendBool(action, "_isUserInitiated")
+	if respondsTo(action, spiIsUserInitiated) {
+		return sendBool(action, spiIsUserInitiated)
 	}
 	return navType == 0 || navType == 1 // WKNavigationTypeLinkActivated, FormSubmitted
 }

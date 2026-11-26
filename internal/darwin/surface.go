@@ -659,11 +659,11 @@ var cursorSelectors = map[platform.Cursor]string{
 	platform.CursorAllScroll: "openHandCursor",
 	// AppKit's own, which it keeps private, as WebKit uses them.
 	platform.CursorProgress: "busyButClickableCursor",
-	platform.CursorWait:     "_waitCursor",
-	platform.CursorHelp:     "_helpCursor",
-	platform.CursorZoomIn:   "_zoomInCursor",
-	platform.CursorZoomOut:  "_zoomOutCursor",
-	platform.CursorCell:     "_cellCursor",
+	platform.CursorWait:     spiWaitCursor,
+	platform.CursorHelp:     spiHelpCursor,
+	platform.CursorZoomIn:   spiZoomInCursor,
+	platform.CursorZoomOut:  spiZoomOutCursor,
+	platform.CursorCell:     spiCellCursor,
 }
 
 // cursorFallbacks are the cursors of older macOS for those it lacks, and
@@ -694,9 +694,9 @@ func (s *surface) applyCursor() {
 func nsCursor(c platform.Cursor) id {
 	cls := class("NSCursor")
 	if c == platform.CursorResizeNWSE || c == platform.CursorResizeNESW {
-		corner, older := uintptr(1|2), "_windowResizeNorthWestSouthEastCursor" // top left
+		corner, older := uintptr(1|2), spiWindowResizeNorthWestSouthEastCursor // top left
 		if c == platform.CursorResizeNESW {
-			corner, older = 1|8, "_windowResizeNorthEastSouthWestCursor" // top right
+			corner, older = 1|8, spiWindowResizeNorthEastSouthWestCursor // top right
 		}
 		if respondsTo(cls, "frameResizeCursorFromPosition:inDirections:") {
 			if cur := send(cls, "frameResizeCursorFromPosition:inDirections:", corner, 1|2); cur != 0 { // inward and outward

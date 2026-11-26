@@ -23,7 +23,11 @@ func TestCursors(t *testing.T) {
 		}
 		for c := platform.CursorDefault; c <= platform.CursorNoDrop; c++ {
 			cur := nsCursor(c)
-			if cur == 0 && (server || c != platform.CursorDefault && c != platform.CursorText) {
+			// The arrow stands for those a build for the Mac App Store
+			// can't take AppKit's private ones of, and comes nil too.
+			arrowed := c == platform.CursorDefault || c == platform.CursorText ||
+				appStore && (c == platform.CursorHelp || c == platform.CursorZoomIn || c == platform.CursorZoomOut)
+			if cur == 0 && (server || !arrowed) {
 				t.Errorf("cursor %d: no NSCursor", c)
 			}
 			if c != platform.CursorDefault && cur == arrow {

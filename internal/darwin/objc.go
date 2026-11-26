@@ -321,8 +321,11 @@ func sendSuperPoint(self id, className string, s objc.SEL, p NSPoint) id {
 	return msgSuperPoint(superOf(self, className, &pin), s, p)
 }
 
+// respondsTo reports whether obj answers selector. It answers false for
+// "", which is what a private selector of spi.go is in a build for the Mac
+// App Store (spi_appstore.go).
 func respondsTo(obj id, selector string) bool {
-	return obj != 0 && sendBool(obj, "respondsToSelector:", uintptr(sel(selector)))
+	return obj != 0 && selector != "" && sendBool(obj, "respondsToSelector:", uintptr(sel(selector)))
 }
 
 func boolArg(b bool) uintptr {
